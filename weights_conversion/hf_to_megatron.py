@@ -44,7 +44,7 @@ from argparse import ArgumentParser, Namespace
 
 import torch
 from tqdm.auto import trange
-from transformers import AutoModelForCausalLM, LlamaTokenizer
+from transformers import AutoModelForCausalLM, LlamaTokenizer, AutoTokenizer
 
 from utils.permute_qkv import permute_qkv
 from utils.merge_llama import merge_llama
@@ -186,79 +186,6 @@ def llama_to_megatron(weights: dict, size: int, source: str = "meta",
     return {"embedding": embedding, "transformer": transformer,
             "lm_head": lm_head}
 
-def phi3_to_megatron(
-    weights: dict,
-    size: int
-) -> dict:
-    assert size == 3
-    def permute(qkv_w):
-        # if source == "hf":
-        # by default, we pull mistrals weights from huggingface
-        return permute_qkv(qkv_w, hidden, n_heads, n_kv_heads)
-        # return qkv_w
-
-    def rearrange_qkv(wq, wk, wv):
-        wq = torch.split(wq, n_hidden_per_head, dim=0)
-        wk = torch.split(wk, n_hidden_per_head, dim=0)
-        wv = torch.split(wv, n_hidden_per_head, dim=0)
-        assert len(wq) == n_heads
-        assert len(wk) == n_kv_heads
-        assert len(wv) == n_kv_heads
-        n_qs_per_kv = n_heads//n_kv_heads
-        w_qkv = []
-        for i in range(n_kv_heads):
-            w_qkv += [wq[i*n_qs_per_kv + j] for j in range(n_qs_per_kv)]
-            w_qkv += [wk[i], wv[i]]
-        return permute(torch.concat(w_qkv))
-
-    # config
-    if size == 3:
-        n_layer = 32
-        hidden = 3072
-        n_heads = 32
-        n_kv_heads = 8
-    n_hidden_per_head = hidden // n_heads
-
-    # weights independent of layers
-    embedding = {"word_embeddings.weight": weights["model.embed_tokens.weight"]}
-    transformer = {"final_layernorm.weight": weights["model.norm.weight"]}
-    lm_head = weights["lm_head.weight"]
-
-    # get all the other weights
-    for layer in trange(n_layer, desc="Converting weights"):
-        prefix = f"layers.{layer}"
-        hf_prefix = f"model.{prefix}"
-        # identical weights
-        transformer[f"{prefix}.attention.dense.weight"] = \
-            weights[f"{hf_prefix}.self_attn.o_proj.weight"]
-        transformer[f"{prefix}.post_attention_layernorm.weight"] = \
-            weights[f"{hf_prefix}.post_attention_layernorm.weight"]
-        transformer[f"{prefix}.input_layernorm.weight"] = \
-            weights[f"{hf_prefix}.input_layernorm.weight"]
-        transformer[f"{prefix}.mlp.dense_4h_to_h.weight"] = \
-            weights[f"{hf_prefix}.mlp.down_proj.weight"]
-        # concatenate up, gate mlp weights
-        transformer[f"{prefix}.mlp.dense_h_to_4h.weight"] = torch.concat([
-            weights[f"{hf_prefix}.mlp.up_proj.weight"],  # w3
-            weights[f"{hf_prefix}.mlp.gate_proj.weight"]  # w1
-        ])
-        # finally, qkv requires serious manipulation to get right (probably same as llama-2)
-        transformer[f"{prefix}.attention.query_key_value.weight"] = rearrange_qkv(
-            weights[f"{hf_prefix}.self_attn.q_proj.weight"],
-            weights[f"{hf_prefix}.self_attn.k_proj.weight"],
-            weights[f"{hf_prefix}.self_attn.v_proj.weight"]
-        )
-
-        # release references to original weights (free mem)
-        del weights[f"{hf_prefix}.mlp.up_proj.weight"]
-        del weights[f"{hf_prefix}.mlp.gate_proj.weight"]
-        del weights[f"{hf_prefix}.self_attn.q_proj.weight"]
-        del weights[f"{hf_prefix}.self_attn.k_proj.weight"]
-        del weights[f"{hf_prefix}.self_attn.v_proj.weight"]
-
-    return {"embedding": embedding, "transformer": transformer,
-            "lm_head": lm_head}
-
 def mistral_to_megatron(
     weights: dict,
     size: int
@@ -332,6 +259,71 @@ def mistral_to_megatron(
     return {"embedding": embedding, "transformer": transformer,
             "lm_head": lm_head}
 
+def phi3_to_megatron(
+    weights: dict,
+    size: int
+) -> dict:
+    assert size == 3
+    def permute(qkv_w):
+        # if source == "hf":
+        # by default, we pull mistrals weights from huggingface
+        return permute_qkv(qkv_w, hidden, n_heads, n_kv_heads)
+        # return qkv_w
+
+    def rearrange_qkv(wq, wk, wv):
+        wq = torch.split(wq, n_hidden_per_head, dim=0)
+        wk = torch.split(wk, n_hidden_per_head, dim=0)
+        wv = torch.split(wv, n_hidden_per_head, dim=0)
+        assert len(wq) == n_heads
+        assert len(wk) == n_kv_heads
+        assert len(wv) == n_kv_heads
+        n_qs_per_kv = n_heads//n_kv_heads
+        w_qkv = []
+        for i in range(n_kv_heads):
+            w_qkv += [wq[i*n_qs_per_kv + j] for j in range(n_qs_per_kv)]
+            w_qkv += [wk[i], wv[i]]
+        return permute(torch.concat(w_qkv))
+
+    # config
+    if size == 3:
+        n_layer = 32
+        hidden = 3072
+        n_heads = 32
+        n_kv_heads = 32
+    n_hidden_per_head = hidden // n_heads  # 96 for phi3-mini
+
+    # weights independent of layers
+    embedding = {"word_embeddings.weight": weights["model.embed_tokens.weight"]}
+    transformer = {"final_layernorm.weight": weights["model.norm.weight"]}
+    lm_head = weights["lm_head.weight"]
+
+    # get all the other weights
+    for layer in trange(n_layer, desc="Converting weights"):
+        prefix = f"layers.{layer}"
+        hf_prefix = f"model.{prefix}"
+        # identical weights
+        transformer[f"{prefix}.attention.dense.weight"] = \
+            weights[f"{hf_prefix}.self_attn.o_proj.weight"]
+        transformer[f"{prefix}.post_attention_layernorm.weight"] = \
+            weights[f"{hf_prefix}.post_attention_layernorm.weight"]
+        transformer[f"{prefix}.input_layernorm.weight"] = \
+            weights[f"{hf_prefix}.input_layernorm.weight"]
+        transformer[f"{prefix}.mlp.dense_4h_to_h.weight"] = \
+            weights[f"{hf_prefix}.mlp.down_proj.weight"]
+        # concatenate up, gate mlp weights
+        transformer[f"{prefix}.mlp.dense_h_to_4h.weight"] = \
+            weights[f"{hf_prefix}.mlp.gate_up_proj.weight"]
+        # finally, qkv requires serious manipulation to get right (probably same as llama-2)
+        transformer[f"{prefix}.attention.query_key_value.weight"] = \
+            weights[f"{hf_prefix}.self_attn.qkv_proj.weight"]
+
+        # release references to original weights (free mem)
+        del weights[f"{hf_prefix}.mlp.down_proj.weight"]
+        del weights[f"{hf_prefix}.mlp.gate_up_proj.weight"]
+        del weights[f"{hf_prefix}.self_attn.qkv_proj.weight"]
+
+    return {"embedding": embedding, "transformer": transformer,
+            "lm_head": lm_head}
 
 def main(model_name: str = "falcon", size: int = 7, out: Optional[Path] = None,
          cache_dir: Optional[Path] = None, model_path: Optional[str] = None):
@@ -363,6 +355,7 @@ def main(model_name: str = "falcon", size: int = 7, out: Optional[Path] = None,
         model = AutoModelForCausalLM.from_pretrained(model_path, 
                                                     trust_remote_code=True,
                                                     cache_dir=cache_dir)
+        hf_weights = model.state_dict()
     else:
         print("Getting llama...")
         version = 2 if "2" in model_name else 1
@@ -427,15 +420,14 @@ def main(model_name: str = "falcon", size: int = 7, out: Optional[Path] = None,
             "num_attention_heads_kv": 32,  # except this - GroupedAttention
             "ffn_hidden_size": 16384,  # except this
             "parallel_attn": False,
-            # "make_vocab_size_divisible_by": 128,
+            "make_vocab_size_divisible_by": 64,
             "glu_activation": "swiglu",  # == silu
-            "padded_vocab_size": 32000,
+            "padded_vocab_size": 32064,
             "use_rms_norm": True,
             "tie_embed_logits": False,
             "tokenizer_type": "SentencePieceTokenizer",
-            
-            "max_position_embeddings": 32768,
-            "seq_length": 32768,
+            "max_position_embeddings": 2048,
+            "seq_length": 4096,
             "layernorm_epsilon": 1e-5,
             "rope_theta": 10000.0,
             "sliding_window_size": 4096,
@@ -523,7 +515,21 @@ def main(model_name: str = "falcon", size: int = 7, out: Optional[Path] = None,
         vocab_file = tokenizer.vocab_file
         shutil.copy(vocab_file, token_path)
         print("Saved tokenizer.model in", token_path)
-
+    elif model_name == "phi3":
+        tokenizer = None
+        if model_path is not None:
+            try:
+                tokenizer = AutoTokenizer.from_pretrained(model_path, cache_dir=cache_dir)
+            except OSError:
+                warnings.warn(f"Model path {model_path} does not have a "
+                              "tokenizer, using default tokenizer instead")
+        if tokenizer is None:
+            tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-4k-instruct",
+                                                       cache_dir=cache_dir)
+        token_path = out/"tokenizer.model"
+        vocab_file = tokenizer.vocab_file
+        shutil.copy(vocab_file, token_path)
+        print("Saved tokenizer.model in", token_path)
     print("Done")
 
 
@@ -553,7 +559,7 @@ if __name__ == "__main__":
     elif args.model == "mistral":
         assert args.size in {7}
     elif args.model == "phi3":
-        assert args.size in {3}
+        assert args.size in {3, 7, 14}
     else:
         assert args.size in {7, 13, 70}
 

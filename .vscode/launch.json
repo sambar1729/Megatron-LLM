@@ -1,0 +1,29 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    // --size=7 --out=$OUTPUT_DIR --model-path=$MISTRAL_WEIGHTS
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "convert",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/weights_conversion/hf_to_megatron.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args":[
+                // "mistral", 
+                // "llama",
+                // "llama2",
+                "phi3",
+                "--out", "/home/aiscuser/tmp",
+                // "--size", "7", 
+                "--size", "3", 
+                // "--model-path", "/mnt/posttraining/ckpts/mistralai_Mistral-7B-v0.1",  // mistral
+                "--model-path", "/mnt/posttraining/ckpts/Phi-3-mini-4k-instruct",  // phi3 mini
+                // "--model-path", "/mnt/posttraining/ckpts/llama-2-7b-chat-hf" //llama2
+            ]
+        }
+    ]
+}
