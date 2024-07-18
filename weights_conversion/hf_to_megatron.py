@@ -201,15 +201,15 @@ def mistral_to_megatron(
         wq = torch.split(wq, n_hidden_per_head, dim=0)
         wk = torch.split(wk, n_hidden_per_head, dim=0)
         wv = torch.split(wv, n_hidden_per_head, dim=0)
-        assert len(wq) == n_heads
-        assert len(wk) == n_kv_heads
-        assert len(wv) == n_kv_heads
-        n_qs_per_kv = n_heads//n_kv_heads
+        assert len(wq) == n_heads       # 32 
+        assert len(wk) == n_kv_heads    # 8
+        assert len(wv) == n_kv_heads    # 8
+        n_qs_per_kv = n_heads//n_kv_heads   # 4
         w_qkv = []
         for i in range(n_kv_heads):
             w_qkv += [wq[i*n_qs_per_kv + j] for j in range(n_qs_per_kv)]
             w_qkv += [wk[i], wv[i]]
-        return permute(torch.concat(w_qkv))
+        return permute(torch.concat(w_qkv))  # size 6144 x 4096
 
     # config
     if size == 7:

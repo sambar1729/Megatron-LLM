@@ -6,7 +6,27 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "convert",
+            "name": "convert mistral",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/weights_conversion/hf_to_megatron.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args":[
+                "mistral", 
+                // "llama",
+                // "llama2",
+                // "phi3",
+                "--out", "/home/aiscuser/tmp-mist",
+                "--size", "7", 
+                // "--size", "3", 
+                "--model-path", "/mnt/posttraining/ckpts/mistralai_Mistral-7B-v0.1",  // mistral
+                // "--model-path", "/mnt/posttraining/ckpts/Phi-3-mini-4k-instruct",  // phi3 mini
+                // "--model-path", "/mnt/posttraining/ckpts/llama-2-7b-chat-hf" //llama2
+            ]
+        },
+        {
+            "name": "convert phi3",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/weights_conversion/hf_to_megatron.py",
@@ -17,7 +37,7 @@
                 // "llama",
                 // "llama2",
                 "phi3",
-                "--out", "/home/aiscuser/tmp",
+                "--out", "/home/aiscuser/tmp-phi",
                 // "--size", "7", 
                 "--size", "3", 
                 // "--model-path", "/mnt/posttraining/ckpts/mistralai_Mistral-7B-v0.1",  // mistral
