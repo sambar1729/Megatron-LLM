@@ -466,7 +466,7 @@ def main(model_name: str = "falcon", size: int = 7, out: Optional[Path] = None,
     args.update({
         "tensor_model_parallel_size": 1,
         "pipeline_model_parallel_size": 1,
-        "iteration": 2500,  # has to be the same as in the latest_checkpointed_iteration.txt, and needs to be a number!
+        "iteration": 200,  # has to be the same as in the latest_checkpointed_iteration.txt, and needs to be a number!
         "bias_gelu_fusion": False,
         "bias_droput_fusion": False,
         "position_embedding_type": "rotary"
@@ -475,11 +475,11 @@ def main(model_name: str = "falcon", size: int = 7, out: Optional[Path] = None,
     # save converted weights in specified out
     (out).mkdir(parents=True)
     with open(out/"latest_checkpointed_iteration.txt", "w+") as f:
-        f.write("2500")
-    final_dict = {"iteration": 2500, "model": {"language_model": megatron_weights},
+        f.write("200")
+    final_dict = {"iteration": 200, "model": {"language_model": megatron_weights},
                   "checkpoint_version": 3.0, "args": Namespace(**args)}
     # torch.save(final_dict, out/"release"/"mp_rank_00"/"model_optim_rng.pt")
-    torch.save(final_dict, out/"model_iter_0002500_mp_rank_000_000_000_optim_rng.pt")
+    torch.save(final_dict, out/"model_iter_0000200_mp_rank_000_000_000_optim_rng.pt")
     print("Saved weights in", out)
 
     if model_name in {"llama", "llama2"} and llama_source == "hf":
@@ -528,7 +528,7 @@ def main(model_name: str = "falcon", size: int = 7, out: Optional[Path] = None,
             tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-4k-instruct",
                                                        cache_dir=cache_dir)
         token_path = out/"tokenizer.model"
-        
+
         ### NO NEED To copy the tokenizer over
         # vocab_file = tokenizer.vocab_file
         # shutil.copy(vocab_file, token_path)
