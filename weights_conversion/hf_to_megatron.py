@@ -323,7 +323,7 @@ def phi3_to_megatron(
         del weights[f"{hf_prefix}.self_attn.qkv_proj.weight"]
 
     return {"embedding": embedding, "transformer": transformer,
-            "lm_head": lm_head}
+            "output_layer": {"weight": lm_head}}
 
 def main(model_name: str = "falcon", size: int = 7, out: Optional[Path] = None,
          cache_dir: Optional[Path] = None, model_path: Optional[str] = None):
