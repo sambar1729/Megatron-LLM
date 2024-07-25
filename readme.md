@@ -14,3 +14,10 @@ Move it to `sambroy/pretraining/checkpoints/` in the posttraining container
 ```
 cp -r tmp-phi /mnt/posttraining/sambroy/pretraining/checkpoints/phi3-megatron-iter0
 ```
+
+### Loading the model
+```
+import torch
+
+model = torch.load("/home/aiscuser/tmp-phi/model_iter_000000_mp_rank_000_000_000_optim_rng.pt")
+```
