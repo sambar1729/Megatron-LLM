@@ -466,20 +466,21 @@ def main(model_name: str = "falcon", size: int = 7, out: Optional[Path] = None,
     args.update({
         "tensor_model_parallel_size": 1,
         "pipeline_model_parallel_size": 1,
-        "iteration": 200,  # has to be the same as in the latest_checkpointed_iteration.txt, and needs to be a number!
+        "iteration": 0,  # has to be the same as in the latest_checkpointed_iteration.txt, and needs to be a number!
         "bias_gelu_fusion": False,
         "bias_droput_fusion": False,
         "position_embedding_type": "rotary"
     })
 
     # save converted weights in specified out
+    iters_before_midtraining = 0
     (out).mkdir(parents=True)
     with open(out/"latest_checkpointed_iteration.txt", "w+") as f:
-        f.write("200")
-    final_dict = {"iteration": 200, "model": {"language_model": megatron_weights},
+        f.write(f"{iters_before_midtraining}")
+    final_dict = {"iteration": iters_before_midtraining, "model": {"language_model": megatron_weights},
                   "checkpoint_version": 3.0, "args": Namespace(**args)}
     # torch.save(final_dict, out/"release"/"mp_rank_00"/"model_optim_rng.pt")
-    torch.save(final_dict, out/"model_iter_0000200_mp_rank_000_000_000_optim_rng.pt")
+    torch.save(final_dict, out/f"model_iter_{iters_before_midtraining:06d}_mp_rank_000_000_000_optim_rng.pt")
     print("Saved weights in", out)
 
     if model_name in {"llama", "llama2"} and llama_source == "hf":
