@@ -36,6 +36,7 @@ stored therein will not be removed when the conversion succeeds.
 """
 
 import re
+import os
 import sys
 import shutil
 from pathlib import Path
@@ -473,14 +474,18 @@ def main(model_name: str = "falcon", size: int = 7, out: Optional[Path] = None,
     })
 
     # save converted weights in specified out
-    iters_before_midtraining = 0
+    iters_before_midtraining = 200
     (out).mkdir(parents=True)
     with open(out/"latest_checkpointed_iteration.txt", "w+") as f:
         f.write(f"{iters_before_midtraining}")
     final_dict = {"iteration": iters_before_midtraining, "model": {"language_model": megatron_weights},
                   "checkpoint_version": 3.0, "args": Namespace(**args)}
     # torch.save(final_dict, out/"release"/"mp_rank_00"/"model_optim_rng.pt")
-    torch.save(final_dict, out/f"model_iter_{iters_before_midtraining:06d}_mp_rank_000_000_000_optim_rng.pt")
+    # outdir = out/f"{iters_before_midtraining}"/"mp_rank_00"
+    outdir = os.path.join(out, f"{iters_before_midtraining}", "mp_rank_00")
+    os.makedirs(outdir, exist_ok=True)
+    torch.save(final_dict, out/f"{iters_before_midtraining}"/"mp_rank_00"/"model_optim_rng.pt")
+    # torch.save(final_dict, out/f"model_iter_{iters_before_midtraining:06d}_mp_rank_000_000_000_optim_rng.pt")
     print("Saved weights in", out)
 
     if model_name in {"llama", "llama2"} and llama_source == "hf":

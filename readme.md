@@ -11,6 +11,7 @@ This produces the file in `~/tmp-phi`
 
 Move it to `sambroy/pretraining/checkpoints/` in the posttraining container 
 
+For megaflection:
 ```
 cp -r tmp-phi /mnt/posttraining/sambroy/pretraining/checkpoints/phi3-megatron-iter0
 ```
